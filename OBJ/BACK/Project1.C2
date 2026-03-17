@@ -1,6 +1,7 @@
 ﻿#include "extern.h"
 
 /* Definitions */
+#define DEV_VERSION		"0.0.1"
 // For Working mode
 #define MODE_NORMAL    	0
 #define MODE_ARLAM    	1
@@ -44,10 +45,7 @@ BYTE setting_alarm_value = 40;
 // For Temperature measurement
 
 
-
 /* Functions */
-
-
 
 // Delay function
 void delay_ms(WORD stime)
@@ -57,8 +55,6 @@ void delay_ms(WORD stime)
 	.delay 1000;
 	}
 }
-
-
 
 // Function to read the ADC value
 BYTE ADC_Read(BYTE channel) 
@@ -81,8 +77,6 @@ BYTE ADC_Read(BYTE channel)
 	return ADCR;
 }
 
-
-
 // Function for PWM
 void PWM_Init(void)
 {
@@ -96,22 +90,16 @@ void PWM_Init(void)
 	TM2C = 0b0001_10_1_0; 
 }
 
-
-
 void PWM_On(void)
 {
     TM2C |= 0b0000_10_0_0; // Set bit 3 to enable PA3 output
 }
-
-
 
 void PWM_Off(void)
 {
     TM2C &= 0b1111_01_1_1; // Clear bit 3 to disable PA3 output
     PA.3 = 0;                    // Ensure pin is LOW
 }
-
-
 
 // Function for GPIO output
 void Output_Init(void)
@@ -125,8 +113,6 @@ void Output_Init(void)
 	OUTPUT_OFF();
 	LED_OFF();
 }
-
-
 
 // Function for Timer 3
 void Tim3_Init(void)
@@ -159,8 +145,6 @@ void Interrupt(void)
     }
     popaf;
 }
-
-
 
 // Main function
 void FPPA0 (void)
