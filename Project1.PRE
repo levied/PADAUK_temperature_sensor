@@ -1,7 +1,7 @@
 ﻿
 .CHIP	PMS171B
 //{{PADAUK_CODE_OPTION
-	.Code_Option	LVR		2.5V
+	.Code_Option	LVR		2.2V
 	.Code_Option	Comparator_Edge	All_Edge
 	.Code_Option	GPC_PWM		Disable
 	.Code_Option	TM2_Out1	PB2

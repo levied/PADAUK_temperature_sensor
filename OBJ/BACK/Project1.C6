@@ -1,54 +1,106 @@
 ﻿#include "extern.h"
+/*
+	Project: Temperature sensor
+	Author: LVD
+	Date: 16/03/2026
+	Target MCU: PMS171B
+*/
 
-/* Definitions */
+/* Note
+- WDT expired cause the reset but RAM is retained
+- Read ADC on VREF (1.2V band-gap voltage) to deduce VCC voltage. If VREF is high, VCC is low
+ */
+
+/*********************************************** Definitions ***********************************************/
+#define DEV_VERSION						"0.0.6"
 // For Working mode
-#define MODE_NORMAL    	0
-#define MODE_ARLAM    	1
-#define MODE_SLEEP    	2
-#define MODE_TEST    	3
+#define MODE_NORMAL    					0
+#define MODE_ALARM    					1
+#define MODE_SLEEP    					2
+#define MODE_TEST    					3
+#define MODE_WAITING    				4
+
+#define MODE_ALARM_TIMEOUT    			1500
+#define MODE_WAITING_TIMEOUT    		1500
+#define MODE_SLEEP_TIMEOUT    			1
 // For buzzer mode
-#define BUZZER_OFF    	0
-#define BUZZER_ALARM  	1
-#define BUZZER_LOW_BAT  2
+#define BUZZER_OFF    					0
+#define BUZZER_ALARM  					1
+#define BUZZER_LOW_BAT  				2
+
+#define BUZZER_ALARM_ON_TIME  			17
+#define BUZZER_ALARM_OFF_TIME  			34
+
+#define BUZZER_LOW_BAT_ON_TIME  		50
+#define BUZZER_LOW_BAT_OFF_TIME  		350
 // For led mode
-#define LED_NORMAL    	0
-#define LED_ALARM    	1
-#define LED_LOW_BAT    	2
+#define LED_NORMAL    					0
+#define LED_ALARM    					1
+#define LED_LOW_BAT    					2
+
+#define LED_NORMAL_ON_TIME  			50
+#define LED_NORMAL_OFF_TIME  			22550
+#define LED_ALARM_ON_TIME  				50
+#define LED_ALARM_OFF_TIME  			100
+#define LED_LOW_BAT_ON_TIME  			50
+#define LED_LOW_BAT_OFF_TIME  			350
+#define LED_MAXIMUM_TIME  				50000
 // For ADC
-#define ADC_ENABLE      0x80 // Bit 7
-#define ADC_START       0x40 // Bit 6
-#define CH_PA0          0x28 // 1010 shifted to bits 5-2
-#define CH_PA4          0x24 // 1001 shifted to bits 5-2
-#define NTC            	0x28 // CH_PA0 for temperature measurement NCT pin
-#define BUTTON_VR    	0x24 // CH_PA4 for temperature setting varistor pin and button
+#define ADC_ENABLE      				0x80 // Bit 7
+#define ADC_START       				0x40 // Bit 6
+#define CH_PA0          				0x28 // 1010 shifted to bits 5-2
+#define CH_PA4          				0x24 // 1001 shifted to bits 5-2
+#define CH_F          					0x3C // 1111 shifted to bits 5-2 for voltage reference
+#define NTC_BUTTON            			0x24 // CH_PA0 for temperature setting variable resistor pin
+#define VR    							0x28 // CH_PA4 for temperature measurement NCT pin and button
+#define VREF    						0x3C // CH_F for VCC voltage checking
 // For OUTPUT
-#define POWER_ON_ADC()  PA.5 = 1; // Turn on power for NTC and VR pins
-#define POWER_OFF_ADC() PA.5 = 0; // Turn off power for NTC and VR pins
-#define OUTPUT_ON()    	PA.6 = 1; // Turn on Relay and RF signal
-#define OUTPUT_OFF()  	PA.6 = 0; // Turn off Relay and RF signal
-#define LED_ON()    	PA.7 = 1; // Turn on LED
-#define LED_OFF()    	PA.7 = 0; // Turn off LED
+#define POWER_ON_ADC()  				PA.5 = 0; // Turn on power for NTC_BUTTON and VR pins
+#define POWER_OFF_ADC() 				PA.5 = 1; // Turn off power for NTC_BUTTON and VR pins
+#define OUTPUT_ON()    					PA.6 = 1; // Turn on Relay and RF signal
+#define OUTPUT_OFF()  					PA.6 = 0; // Turn off Relay and RF signal
+#define LED_ON()    					PA.7 = 0; // Turn on LED
+#define LED_OFF()    					PA.7 = 1; // Turn off LED
 // For Temperature check
-#define VR_MAX_VALUE  	200
-/* Variables */
+#define TEMPERATURE_SET_MIN				40 // 40 Celsius degree
+#define TEMPERATURE_SET_MAX				80 // 80 Celsius degree
+#define VR_MIN_VALUE  					0
+#define VR_MAX_VALUE  					140 // VR_MAX_VALUE = 255*(VR/(R1 + VR)); R1 = 470K, VR = 500K -> VR_MAX_VALUE = 131 + tolarent(9) = 140
+#define NTC_BUTTON_MAX_VALUE			230 // Using to detect Button is pressed on ADC pin
+#define NTC_BUTTON_AT_SETTING_MIN_VALUE	82
+#define NTC_BUTTON_AT_SETTING_MAX_VALUE	20
+#define TEMP_ARRAY_SIZE					14
+// For VREF checking
+#define VREF_AT_3V3						93
+#define VREF_AT_2V5						122
+#define VREF_AT_2V3						133
+#define VREF_AT_2V2						139
+
+// For Sleeping
+#define ENTER_SLEEP()					stopexe // nop; //
+
+/*********************************************** Variables ***********************************************/
 // For system
-WORD tick_100ms[2];
+WORD tick_10ms[2];
+WORD tick_alarm;
+WORD tick_waiting;
+//WORD tick_sleep;
 WORD tick_buzzer;
+WORD tick_led;
+BYTE task_10ms_state = 0;
 // For mode
 BYTE working_mode = MODE_NORMAL;
 BYTE buzzer_mode = BUZZER_OFF;
 BYTE led_mode = LED_NORMAL;
 // For Temperature measurement
 BYTE adc_value = 0;
-BYTE setting_alarm_value = 40;
-// For Temperature measurement
+BYTE setting_alarm_value = NTC_BUTTON_AT_SETTING_MAX_VALUE;
+BYTE temp_array[TEMP_ARRAY_SIZE] = {82,77,72,68,63,58,53,49,44,39,35,30,25,20};
+// For Led
+WORD led_on_time;
+WORD led_off_time;
 
-
-
-/* Functions */
-
-
-
+/*********************************************** Functions ***********************************************/
 // Delay function
 void delay_ms(WORD stime)
 {
@@ -57,8 +109,6 @@ void delay_ms(WORD stime)
 	.delay 1000;
 	}
 }
-
-
 
 // Function to read the ADC value
 BYTE ADC_Read(BYTE channel) 
@@ -76,34 +126,52 @@ BYTE ADC_Read(BYTE channel)
 	{
 	    // Wait...
 	}
-
+	delay_ms(1); // Workaround: Delay to get right ADCR, if not it can return 0xFF
 	// 4. Return the 8-bit result
 	return ADCR;
 }
 
-
-
+void ADC_Init(void) 
+{
+	ADCM = 0x86;
+	ADCRGC = 0;
+}
 // Function for PWM
 void PWM_Init(void)
 {
-	PAC.3 = 1;                   // PA3 as output
-	TM2CT = 0;                   // Reset counter
+	/*
+	PAC.3 = 1; // PA3 as output
+	TM2CT = 0; // Reset counter
 	// Frequency: 4MHz / 4 (S2) / 256 = 3.9kHz
 	TM2S = 0b0_00_00100;   // 8-bit, S1=1, S2=4
 	// Duty Cycle: 128/256 = 50%
 	TM2B = 128;            
 	// Mode: Fsys, Output PA3, PWM Mode
 	TM2C = 0b0001_10_1_0; 
+
+	// Disable output after Init
+	TM2C &= 0b1111_01_1_1; // Clear bit 3 to disable PA3 output
+    PA.3 = 0;                    // Ensure pin is LOW
+	*/
+
+	PAC.3 = 1; // PA3 as output
+	TM2CT = 0; // Reset counter
+	// Frequency: 16MHz / 16 (S2) / 256 = 3.9kHz
+	TM2S = 0b0_00_10000;   // 8-bit, S1=1, S2=4
+	// Duty Cycle: 128/256 = 50%
+	TM2B = 128;
+	// Mode: Fsys, Output PA3, PWM Mode
+	TM2C = 0b0010_10_1_0; 
+
+	// Disable output after Init
+	TM2C &= 0b1111_01_1_1; // Clear bit 3 to disable PA3 output
+    PA.3 = 0;                    // Ensure pin is LOW
 }
-
-
 
 void PWM_On(void)
 {
     TM2C |= 0b0000_10_0_0; // Set bit 3 to enable PA3 output
 }
-
-
 
 void PWM_Off(void)
 {
@@ -111,14 +179,12 @@ void PWM_Off(void)
     PA.3 = 0;                    // Ensure pin is LOW
 }
 
-
-
 // Function for GPIO output
 void Output_Init(void)
 {
 	// Init OUTPUT and LED
 	PA = 0b0000_0000;  // Standardize binary literals
-	PAC = 0b1110_0000; // Set input/output PA5: enable power supply for NTC, VR; PA6: OUTPUT; PA7: LED
+	PAC = 0b1110_0000; // Set input/output PA5: enable power supply for NTC_BUTTON, VR; PA6: OUTPUT; PA7: LED
 	PAPH = 0b0000_0000; // Disable all pull-high on PA
 	PADIER = 0b0000_0000; // Disable digital input on PA
 	POWER_OFF_ADC();
@@ -126,123 +192,332 @@ void Output_Init(void)
 	LED_OFF();
 }
 
-
-
 // Function for Timer 3
 void Tim3_Init(void)
 {
+	// Enable ILRC
+	CLKMD.2 = 1;
 	// Set clock = SYSCLK, period mode
-	TM3C = 0x12;
+	//TM3C = 0x10;
+	TM3C = 0x40; // Set clock = ILRC
 	// 8 bit, clock prescalar = 64, clock scalar = 24 -> devider = prescalar*(scalar + 1) = 64*25 = 1600
 	// Timer 3 clock = 4Mhz/1600 = 2500
-	TM3S = 0x78;
-	// TM3B: Set bound to 250 for 100ms
-	TM3B = 250;
+	//TM3S = 0x78;
+	TM3S = 0x60; // Timer 3 clock = 32768/64 = 512
+	// TM3B: Set bound to 5 for 10ms
+	TM3B = 5;
 	// Enable Timer3
 	TM3C |= 0x01; 
 }
 
+// Function for WDT
+void WDT_Init(void)
+{
+	// Binary: 0000 0111 (Sets WDT to 256k ILRC clocks), Disable LVR
+	//MISC = 0x07; 
+	// Enable ILRC
+	CLKMD.2 = 1;
+	.delay 1000;
+	MISC = 0x04; 
+	// Enable Watchdog
+	CLKMD.1 = 1;
+}
 // Function for interrupt
 void Interrupt(void)
 {
     pushaf;
     if (Intrq.TM3) 
     {
-        // Timer 3 Interrupt occurs every 1ms
-        tick_100ms[0]++;
-		if(tick_100ms[0] == 0xFFFF)
+        // Timer 3 Interrupt occurs every 10ms
+        tick_10ms[0]++;
+		if(tick_10ms[0] == 0xFFFF)
 		{
-			tick_100ms[1]++;
+			tick_10ms[1]++;
 		}
         // Clear Timer 3 interrupt request flag
-        Intrq.TM3 = 0; 
+        Intrq.TM3 = 0;
+		task_10ms_state = 1;
     }
     popaf;
 }
 
+// Function for setting temperature
+BYTE convert_setting_alarm(BYTE adc_val)
+{
+	BYTE i = 0;
+	BYTE result = 0;
 
+	while(i < TEMP_ARRAY_SIZE)
+	{
+		if(result >= adc_val)
+		{
+			result = temp_array[i];
+			return result;
+		}
+		i++;
+		result += 10;
+	}
+
+	// If adc_val is higher than all results then return the last value of arrway(the highest temperature)
+	result = temp_array[TEMP_ARRAY_SIZE - 1];
+	return result;
+}
+
+// Function for enter Working Normal mode
+void enter_working_normal_mode(void)
+{
+	working_mode = MODE_NORMAL;
+	OUTPUT_OFF();
+	buzzer_mode = BUZZER_OFF;
+	led_mode = LED_NORMAL;
+}
+
+// Functions for System Clock
+void high_speed_system_clock_init(void)
+{
+	// Enable IHRC
+	CLKMD.4 = 1;
+	.delay 200;
+	// Fysy = IHRC/4, Enable IHRC,ILRC,WDT
+	CLKMD = 0b000_1_0_1_1_0;
+}
+
+void low_speed_system_clock_init(void)
+{
+	// Fysy = ILRC, Disable IHRC, Enable ILRC,WDT
+	CLKMD = 0b111_1_0_1_1_0;
+	.delay 200;
+	// Disable IHRC
+	CLKMD.4 = 0;
+}
 
 // Main function
-void FPPA0 (void)
+void FPPA0(void)
 {
 	// Set system clock
 	.ADJUST_IC SYSCLK=IHRC/4;
+
 	// Init peripherals
 	PWM_Init();
 	Output_Init();
 	Tim3_Init();
+	ADC_Init();
 
 	// --- Interrupt Setup ---
 	IntEn.TM3 = 1;      // Enable Timer 3 Interrupt
 	Intrq = 0;          // Clear all interrupt requests
 	engint;             // Enable Global Interrupts
 
-    while (1)
+	POWER_ON_ADC(); // On power supply for ADC pins
+	delay_ms(2000); // delay for fill capacitor
+	WDT_Init();
+
+    while(1)
     {
-		/*
+		// Refesh WDT
+		wdreset;
 	    //////////////////////////// Working mode process ////////////////////////////
 	    if(working_mode == MODE_NORMAL)
 	    {
-			// ADC process
+			// ADC processS
 			POWER_ON_ADC(); // On power supply for ADC pins
-			delay_ms(10); // delay for fill capacitor
+			//delay_ms(10); // delay for fill capacitor
 			// Check NCT, Measure Temperature
-			adc_value = ADC_Read(NTC); // Get ADC on NTC pin
-			if(adc_value > setting_alarm_value)
+			adc_value = ADC_Read(NTC_BUTTON); // Get ADC on NTC_BUTTON pin
+			if(adc_value < setting_alarm_value)  // The higher temperature, the lower ADC value
 			{
+				// Enter Alarm mode
+				working_mode = MODE_ALARM;
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
 			}
-			// Check BUTTON_VR for setting temperature value
-			adc_value = ADC_Read(BUTTON_VR); // Get ADC on BUTTON_VR pin
+			else if(adc_value > NTC_BUTTON_MAX_VALUE) // Button is pressed, button short VCC to adc pin
+			{
+				// Enter Test mode
+				working_mode = MODE_TEST;
+				// Do the same actions as Alarm mode
+				OUTPUT_ON();   // On Relay and RF
+				buzzer_mode = BUZZER_ALARM;
+				led_mode = LED_ALARM;
+			}
+			else
+			{
+				// Check VCC for low voltage checking
+				adc_value = ADC_Read(VREF); // Get ADC on VREF pin
+				if(adc_value > VREF_AT_2V2) // Lower battery lead the vref adc read higher(30% 2 AA batteries)
+				{
+					// Set Low battery mode for Buzzer and Led
+					buzzer_mode = BUZZER_LOW_BAT;
+					led_mode = LED_LOW_BAT;
+				}
+				else if(adc_value < VREF_AT_2V3) // 40% 2 AA batteries
+				{
+					// Enter Sleep mode
+					working_mode = MODE_SLEEP;
+				}
+			}
+			// Check VR for setting temperature value
+			adc_value = ADC_Read(VR); // Get ADC on VR pin
 			if(adc_value < VR_MAX_VALUE) // Varistor divider voltage
 			{
-				setting_alarm_value = adc_value;
+				setting_alarm_value = convert_setting_alarm(adc_value);
 			}
-			else // Button is pressed, button short VCC to adc pin
-			{
-				working_mode = MODE_TEST;
-			}
-			POWER_OFF_ADC(); // Off power supply for ADC pins
+
+			//POWER_OFF_ADC(); // Off power supply for ADC pins
 	    }
+		else if(working_mode == MODE_WAITING)
+	    {
+			POWER_ON_ADC(); // On power supply for ADC pins
+			//delay_ms(10); // delay for fill capacitor
+			// Check NCT, Measure Temperature
+			adc_value = ADC_Read(NTC_BUTTON); // Get ADC on NTC_BUTTON pin
+			if(adc_value > NTC_BUTTON_MAX_VALUE) // Button is pressed, button short VCC to adc pin
+			{
+				// Enter Test mode
+				working_mode = MODE_TEST;
+				// Do the same actions as Alarm mode
+				OUTPUT_ON();   // On Relay and RF
+				buzzer_mode = BUZZER_ALARM;
+				led_mode = LED_ALARM;
+			}
+		}
 	    else if(working_mode == MODE_TEST)
 	    {
 			POWER_ON_ADC(); // On power supply for ADC pins
-			adc_value = ADC_Read(BUTTON_VR); // Get ADC on BUTTON_VR pin
-			if(adc_value < VR_MAX_VALUE) // Button is released
+			//delay_ms(10); // delay for fill capacitor
+			adc_value = ADC_Read(NTC_BUTTON); // Get ADC on VR pin
+			if(adc_value < NTC_BUTTON_MAX_VALUE) // Button is released
 			{
-			// out the testing mode if button is released
-			working_mode = MODE_NORMAL;
+				// out the testing mode if button is released
+				enter_working_normal_mode();
 			}
-			POWER_OFF_ADC(); // Off power supply for ADC pins
+			//POWER_OFF_ADC(); // Off power supply for ADC pins
 	    }
-	    //////////////////////////// Buzzer mode process ////////////////////////////
-	    if(buzzer_mode == BUZZER_ALARM)
-	    {
-	     	PWM_On();
-	    }
-	    else if(buzzer_mode == BUZZER_LOW_BAT)
-	    {
-	      	PWM_On();
-	    }
-	    else
-	    {
-			PWM_Off();
-	    }
-		*/
-
-		if((tick_100ms[0] - tick_buzzer) == 10)
+	    //////////////////////////// Task 10ms ////////////////////////////
+		if(task_10ms_state == 1)
 		{
-			PWM_On();
-			OUTPUT_ON();
-		}
-		if(tick_100ms[0] >= 20)
-		{
-			PWM_Off();
-			tick_100ms[0] = 0;
-			OUTPUT_OFF();
-		}
+			task_10ms_state = 0;
+			//////////////////////////// Working mode process ////////////////////////////
+			if(working_mode == MODE_ALARM)
+			{
+				tick_alarm++;
+				if(tick_alarm > MODE_ALARM_TIMEOUT)
+				{
+					working_mode = MODE_WAITING;
+					//enter_working_normal_mode();
+					tick_alarm = 0;
+				}
+			}
+			else if(working_mode == MODE_WAITING)
+			{
+				tick_waiting++;
+				if(tick_waiting > MODE_WAITING_TIMEOUT)
+				{
+					enter_working_normal_mode();
+					tick_waiting = 0;
+				}
+			}
+			else if(working_mode == MODE_SLEEP)
+			{
+				// Increase sleep time before enter sleep
+				OUTPUT_OFF();
+				buzzer_mode = BUZZER_OFF;
+				led_mode = LED_NORMAL;
+				PWM_Off();
+				LED_OFF();
+				wdreset;
+				TM3CT = 0; 	// Clear Tim3 counter
+				TM3B = 100; // Increase Tim3 overflow interval to 200ms
+				low_speed_system_clock_init();
+				ENTER_SLEEP();
+				// Back to the normal state after wakeup
+				wdreset;
+				TM3CT = 0; 	// Clear Tim3 counter
+				TM3B = 5; 	// Decrease Tim3 overflow interval to 10ms
+				high_speed_system_clock_init();
+				enter_working_normal_mode();
+				tick_led = LED_MAXIMUM_TIME; // Set tick_led = maximum to turn off LED in blinking process
+			}
 
+			//////////////////////////// Buzzer mode process ////////////////////////////
+			if(buzzer_mode == BUZZER_ALARM)
+		    {
+				if(working_mode == MODE_WAITING) // OFF buzzer if in Waiting mode
+				{
+					PWM_Off();
+				}
+				else  // Turn ON 0.17s OFF 0.34s
+				{
+					tick_buzzer++;
+			      	if(tick_buzzer < BUZZER_ALARM_ON_TIME) 
+					{
+						PWM_On();
+					}
+					else if(tick_buzzer > BUZZER_ALARM_ON_TIME) 
+					{
+						PWM_Off();
+					}
+					if(tick_buzzer > BUZZER_ALARM_OFF_TIME) 
+					{
+						PWM_Off();
+						tick_buzzer = 0;
+					}
+				}
+		    }
+		    else if(buzzer_mode == BUZZER_LOW_BAT) // Turn ON 0.5s OFF 3s
+		    {
+				tick_buzzer++;
+		      	if(tick_buzzer < BUZZER_LOW_BAT_ON_TIME) 
+				{
+					PWM_On();
+				}
+				else if(tick_buzzer > BUZZER_LOW_BAT_ON_TIME) 
+				{
+					PWM_Off();
+				}
+				if(tick_buzzer > BUZZER_LOW_BAT_OFF_TIME) 
+				{
+					PWM_Off();
+					tick_buzzer = 0;
+				}
+		    }
+		    else // OFF Buzzer
+		    {
+				PWM_Off();
+		    }
+			//////////////////////////// Led mode process ////////////////////////////
+			if(led_mode == LED_NORMAL) // Turn ON 0.5s OFF 225s
+		    {
+				led_on_time = LED_NORMAL_ON_TIME;
+				led_off_time = LED_NORMAL_OFF_TIME;
+		    }
+			else if(led_mode == LED_ALARM) // Turn ON 0.5s OFF 0.5s
+		    {
+				led_on_time = LED_ALARM_ON_TIME;
+				led_off_time = LED_ALARM_OFF_TIME;
+		    }
+			else if(led_mode == LED_LOW_BAT) // Turn ON 0.5s OFF 3s
+		    {
+				led_on_time = LED_LOW_BAT_ON_TIME;
+				led_off_time = LED_LOW_BAT_OFF_TIME;
+		    }
+			// Led Blinking process
+			tick_led++;
+	      	if(tick_led < led_on_time) 
+			{
+				LED_ON();
+			}
+			else if(tick_led > led_on_time) 
+			{
+				LED_OFF();
+			}
+			if(tick_led > led_off_time) 
+			{
+				LED_OFF();
+				tick_led = 0;
+			}
+		}
+		ENTER_SLEEP();
     }
 }

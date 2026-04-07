@@ -1,0 +1,9 @@
+﻿17/03/2026: DEV_VERSION 0.0.1
+- Create log
+18/03/2026: DEV_VERSION 0.0.1
+- Add task_10ms and convert_setting_alarm
+19/03/2026: DEV_VERSION 0.0.1
+- Add full functions
+20/03/2026: DEV_VERSION 0.0.1
+- Change LOW battery Voltage from 2V5 to 2V2(30%)
+- Only go to sleep if VCC higher 2V3(40%)
