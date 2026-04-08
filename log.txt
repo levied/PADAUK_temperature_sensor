@@ -24,4 +24,7 @@
 07/04/2026: DEV_VERSION 0.0.6
 - Complete the sleep mode(change clock to reduce power consumption)
 - Change Timer 3 clock calculation from 32k to 56k
-
+08/04/2026: DEV_VERSION 0.0.7
+- Fixed bug led is not toggle in MODE_NORMAL
+- Sync buzzer and led toggle and change interval to 0.2s in MODE_ALARM
+- Do MODE_TEST 2 times if short press, continue if it is still pressing
