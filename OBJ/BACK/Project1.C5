@@ -12,7 +12,7 @@
  */
 
 /*********************************************** Definitions ***********************************************/
-#define DEV_VERSION						"0.0.6"
+#define DEV_VERSION						"0.0.8"
 // For Working mode
 #define MODE_NORMAL    					0
 #define MODE_ALARM    					1
@@ -28,32 +28,33 @@
 #define BUZZER_ALARM  					1
 #define BUZZER_LOW_BAT  				2
 
-#define BUZZER_ALARM_ON_TIME  			17
-#define BUZZER_ALARM_OFF_TIME  			34
+#define BUZZER_ALARM_ON_TIME  			20		// Calculate based on 10ms tick
+#define BUZZER_ALARM_OFF_TIME  			40		// Calculate based on 10ms tick
 
-#define BUZZER_LOW_BAT_ON_TIME  		50
-#define BUZZER_LOW_BAT_OFF_TIME  		350
+#define BUZZER_LOW_BAT_ON_TIME  		50		// Calculate based on 10ms tick
+#define BUZZER_LOW_BAT_OFF_TIME  		350		// Calculate based on 10ms tick
+
+#define BUZZER_TOGGLE_COUNT  			2
 // For led mode
 #define LED_NORMAL    					0
 #define LED_ALARM    					1
 #define LED_LOW_BAT    					2
 
-#define LED_NORMAL_ON_TIME  			50
-#define LED_NORMAL_OFF_TIME  			22550
-#define LED_ALARM_ON_TIME  				50
-#define LED_ALARM_OFF_TIME  			100
-#define LED_LOW_BAT_ON_TIME  			50
-#define LED_LOW_BAT_OFF_TIME  			350
-#define LED_MAXIMUM_TIME  				50000
+#define LED_NORMAL_ON_TIME  			5		// Calculate based on 100ms tick, 5*100ms = 0.5s
+#define LED_NORMAL_OFF_TIME  			2250 	// Calculate based on 100ms tick, 2250*100ms = 225s
+#define LED_ALARM_ON_TIME  				20 		// Calculate based on 10ms tick
+#define LED_ALARM_OFF_TIME  			40 		// Calculate based on 10ms tick
+#define LED_LOW_BAT_ON_TIME  			50 		// Calculate based on 10ms tick
+#define LED_LOW_BAT_OFF_TIME  			350 	// Calculate based on 10ms tick
 // For ADC
-#define ADC_ENABLE      				0x80 // Bit 7
-#define ADC_START       				0x40 // Bit 6
-#define CH_PA0          				0x28 // 1010 shifted to bits 5-2
-#define CH_PA4          				0x24 // 1001 shifted to bits 5-2
-#define CH_F          					0x3C // 1111 shifted to bits 5-2 for voltage reference
-#define NTC_BUTTON            			0x24 // CH_PA0 for temperature setting variable resistor pin
-#define VR    							0x28 // CH_PA4 for temperature measurement NCT pin and button
-#define VREF    						0x3C // CH_F for VCC voltage checking
+#define ADC_ENABLE      				0x80 	// Bit 7
+#define ADC_START       				0x40 	// Bit 6
+#define CH_PA0          				0x28 	// 1010 shifted to bits 5-2
+#define CH_PA4          				0x24 	// 1001 shifted to bits 5-2
+#define CH_F          					0x3C 	// 1111 shifted to bits 5-2 for voltage reference
+#define NTC_BUTTON            			0x24 	// CH_PA0 for temperature setting variable resistor pin
+#define VR    							0x28 	// CH_PA4 for temperature measurement NCT pin and button
+#define VREF    						0x3C 	// CH_F for VCC voltage checking
 // For OUTPUT
 #define POWER_ON_ADC()  				PA.5 = 0; // Turn on power for NTC_BUTTON and VR pins
 #define POWER_OFF_ADC() 				PA.5 = 1; // Turn off power for NTC_BUTTON and VR pins
@@ -99,6 +100,8 @@ BYTE temp_array[TEMP_ARRAY_SIZE] = {82,77,72,68,63,58,53,49,44,39,35,30,25,20};
 // For Led
 WORD led_on_time;
 WORD led_off_time;
+// For Test mode
+BYTE test_mode_buzzer_toggle_count = 0;
 
 /*********************************************** Functions ***********************************************/
 // Delay function
@@ -187,7 +190,7 @@ void Output_Init(void)
 	PAC = 0b1110_0000; // Set input/output PA5: enable power supply for NTC_BUTTON, VR; PA6: OUTPUT; PA7: LED
 	PAPH = 0b0000_0000; // Disable all pull-high on PA
 	PADIER = 0b0000_0000; // Disable digital input on PA
-	POWER_OFF_ADC();
+	POWER_ON_ADC();
 	OUTPUT_OFF();
 	LED_OFF();
 }
@@ -321,7 +324,6 @@ void FPPA0(void)
 	    {
 			// ADC processS
 			POWER_ON_ADC(); // On power supply for ADC pins
-			//delay_ms(10); // delay for fill capacitor
 			// Check NCT, Measure Temperature
 			adc_value = ADC_Read(NTC_BUTTON); // Get ADC on NTC_BUTTON pin
 			if(adc_value < setting_alarm_value)  // The higher temperature, the lower ADC value
@@ -331,15 +333,22 @@ void FPPA0(void)
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				//tick_buzzer = 0;
+				//tick_led = 0;
 			}
 			else if(adc_value > NTC_BUTTON_MAX_VALUE) // Button is pressed, button short VCC to adc pin
 			{
 				// Enter Test mode
 				working_mode = MODE_TEST;
+				test_mode_buzzer_toggle_count = BUZZER_TOGGLE_COUNT;
 				// Do the same actions as Alarm mode
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				//tick_buzzer = 0;
+				//tick_led = 0;
 			}
 			else
 			{
@@ -363,8 +372,6 @@ void FPPA0(void)
 			{
 				setting_alarm_value = convert_setting_alarm(adc_value);
 			}
-
-			//POWER_OFF_ADC(); // Off power supply for ADC pins
 	    }
 		else if(working_mode == MODE_WAITING)
 	    {
@@ -376,10 +383,14 @@ void FPPA0(void)
 			{
 				// Enter Test mode
 				working_mode = MODE_TEST;
+				test_mode_buzzer_toggle_count = BUZZER_TOGGLE_COUNT;
 				// Do the same actions as Alarm mode
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				//tick_buzzer = 0;
+				//tick_led = 0;
 			}
 		}
 	    else if(working_mode == MODE_TEST)
@@ -389,10 +400,20 @@ void FPPA0(void)
 			adc_value = ADC_Read(NTC_BUTTON); // Get ADC on VR pin
 			if(adc_value < NTC_BUTTON_MAX_VALUE) // Button is released
 			{
-				// out the testing mode if button is released
-				enter_working_normal_mode();
+				// Only exit testing mode if buzzer has toggled for enough times, avoid exit testing mode when button is released but the buzzer has not toggled for enough times
+				if(test_mode_buzzer_toggle_count == 0) 
+				{
+					enter_working_normal_mode();
+				}
 			}
-			//POWER_OFF_ADC(); // Off power supply for ADC pins
+			else
+			{
+				// If button is still pressed, reset the toggle count to avoid exit testing mode
+				if(test_mode_buzzer_toggle_count == 0) // Only reset toggle count when it is 0
+				{
+					test_mode_buzzer_toggle_count = 1;
+				}
+			}
 	    }
 	    //////////////////////////// Task 10ms ////////////////////////////
 		if(task_10ms_state == 1)
@@ -405,7 +426,6 @@ void FPPA0(void)
 				if(tick_alarm > MODE_ALARM_TIMEOUT)
 				{
 					working_mode = MODE_WAITING;
-					//enter_working_normal_mode();
 					tick_alarm = 0;
 				}
 			}
@@ -421,23 +441,21 @@ void FPPA0(void)
 			else if(working_mode == MODE_SLEEP)
 			{
 				// Increase sleep time before enter sleep
-				OUTPUT_OFF();
 				buzzer_mode = BUZZER_OFF;
 				led_mode = LED_NORMAL;
+				OUTPUT_OFF();
 				PWM_Off();
-				LED_OFF();
 				wdreset;
 				TM3CT = 0; 	// Clear Tim3 counter
-				TM3B = 180; // Increase Tim3 overflow interval to 200ms
+				TM3B = 90; // Increase Tim3 overflow interval to 100ms
 				low_speed_system_clock_init();
 				ENTER_SLEEP();
 				// Back to the normal state after wakeup
 				wdreset;
-				TM3CT = 0; 	// Clear Tim3 counter
-				TM3B = 9; 	// Decrease Tim3 overflow interval to 10ms
+				TM3CT = 8; 	// Clear Tim3 counter
+				TM3B = 9; 	// Decrease Tim3 overflow interval to 10ms -> Totally 200ms with ILRC clock
 				high_speed_system_clock_init();
 				enter_working_normal_mode();
-				tick_led = LED_MAXIMUM_TIME; // Set tick_led = maximum to turn off LED in blinking process
 			}
 
 			//////////////////////////// Buzzer mode process ////////////////////////////
@@ -447,7 +465,7 @@ void FPPA0(void)
 				{
 					PWM_Off();
 				}
-				else  // Turn ON 0.17s OFF 0.34s
+				else  // Turn ON 0.20s OFF 0.20s
 				{
 					tick_buzzer++;
 			      	if(tick_buzzer < BUZZER_ALARM_ON_TIME) 
@@ -462,6 +480,10 @@ void FPPA0(void)
 					{
 						PWM_Off();
 						tick_buzzer = 0;
+						if(test_mode_buzzer_toggle_count > 0) // If in Test mode, only toggle buzzer for a certain times
+						{
+							test_mode_buzzer_toggle_count--;
+						}
 					}
 				}
 		    }
@@ -487,12 +509,12 @@ void FPPA0(void)
 				PWM_Off();
 		    }
 			//////////////////////////// Led mode process ////////////////////////////
-			if(led_mode == LED_NORMAL) // Turn ON 0.5s OFF 225s
+			if(led_mode == LED_NORMAL) // Turn ON 0.6s OFF 225s
 		    {
 				led_on_time = LED_NORMAL_ON_TIME;
 				led_off_time = LED_NORMAL_OFF_TIME;
 		    }
-			else if(led_mode == LED_ALARM) // Turn ON 0.5s OFF 0.5s
+			else if(led_mode == LED_ALARM) // Turn ON 0.2s OFF 0.2s
 		    {
 				led_on_time = LED_ALARM_ON_TIME;
 				led_off_time = LED_ALARM_OFF_TIME;

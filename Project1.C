@@ -12,7 +12,7 @@
  */
 
 /*********************************************** Definitions ***********************************************/
-#define DEV_VERSION						"0.0.7"
+#define DEV_VERSION						"0.0.8"
 // For Working mode
 #define MODE_NORMAL    					0
 #define MODE_ALARM    					1
@@ -40,8 +40,8 @@
 #define LED_ALARM    					1
 #define LED_LOW_BAT    					2
 
-#define LED_NORMAL_ON_TIME  			3		// Calculate based on 200ms tick, 3*200ms = 0.6s
-#define LED_NORMAL_OFF_TIME  			1125 	// Calculate based on 200ms tick, 1125*200ms = 225s
+#define LED_NORMAL_ON_TIME  			5		// Calculate based on 100ms tick, 5*100ms = 0.5s
+#define LED_NORMAL_OFF_TIME  			2250 	// Calculate based on 100ms tick, 2250*100ms = 225s
 #define LED_ALARM_ON_TIME  				20 		// Calculate based on 10ms tick
 #define LED_ALARM_OFF_TIME  			40 		// Calculate based on 10ms tick
 #define LED_LOW_BAT_ON_TIME  			50 		// Calculate based on 10ms tick
@@ -333,6 +333,9 @@ void FPPA0(void)
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				//tick_buzzer = 0;
+				//tick_led = 0;
 			}
 			else if(adc_value > NTC_BUTTON_MAX_VALUE) // Button is pressed, button short VCC to adc pin
 			{
@@ -343,6 +346,9 @@ void FPPA0(void)
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				//tick_buzzer = 0;
+				//tick_led = 0;
 			}
 			else
 			{
@@ -382,6 +388,9 @@ void FPPA0(void)
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				//tick_buzzer = 0;
+				//tick_led = 0;
 			}
 		}
 	    else if(working_mode == MODE_TEST)
@@ -402,7 +411,7 @@ void FPPA0(void)
 				// If button is still pressed, reset the toggle count to avoid exit testing mode
 				if(test_mode_buzzer_toggle_count == 0) // Only reset toggle count when it is 0
 				{
-					test_mode_buzzer_toggle_count = BUZZER_TOGGLE_COUNT;
+					test_mode_buzzer_toggle_count = 1;
 				}
 			}
 	    }
@@ -438,13 +447,13 @@ void FPPA0(void)
 				PWM_Off();
 				wdreset;
 				TM3CT = 0; 	// Clear Tim3 counter
-				TM3B = 170; // Increase Tim3 overflow interval to 190ms
+				TM3B = 90; // Increase Tim3 overflow interval to 100ms
 				low_speed_system_clock_init();
 				ENTER_SLEEP();
 				// Back to the normal state after wakeup
 				wdreset;
-				TM3CT = 0; 	// Clear Tim3 counter
-				TM3B = 9; 	// Decrease Tim3 overflow interval to 10ms -> Totally 200ms with ILRC clock
+				TM3CT = 8; 	// Set Tim3 counter close to overflow value to pass the next interrupt 
+				TM3B = 9; 	// Set Tim3 overflow interval to 10ms
 				high_speed_system_clock_init();
 				enter_working_normal_mode();
 			}
