@@ -7,3 +7,31 @@
 20/03/2026: DEV_VERSION 0.0.1
 - Change LOW battery Voltage from 2V5 to 2V2(30%)
 - Only go to sleep if VCC higher 2V3(40%)
+25/03/2026: DEV_VERSION 0.0.2
+- Swap the NTC and VR pins
+- Move Button to NCT pin instead of VR pin
+04/04/2026: DEV_VERSION 0.0.3
+- Fixed bug Timer 3
+- Startup: Delay enable ADC 2 seconds
+- Delay 10ms to convert ADC
+05/04/2026: DEV_VERSION 0.0.4
+- Using sleep(stopexe) instead of deep sleep(stopsys)
+- Change timer 3 and PWM clock source to ILRC
+06/04/2026: DEV_VERSION 0.0.5
+- Add MODE_WAITING
+- Toggle Buzzer if it is in MODE_ALARM for 15 second then enter MODE_WAITING
+- Do not POWER_OFF_ADC() anymore and disable delay 10ms after POWER_ON_ADC()
+07/04/2026: DEV_VERSION 0.0.6
+- Complete the sleep mode(change clock to reduce power consumption)
+- Change Timer 3 clock calculation from 32k to 56k
+08/04/2026: DEV_VERSION 0.0.7
+- Fixed bug led is not toggle in MODE_NORMAL
+- Sync buzzer and led toggle and change interval to 0.2s in MODE_ALARM
+- Do MODE_TEST 2 times if short press, continue if it is still pressing
+08/04/2026: DEV_VERSION 0.0.8
+- Change sleep timeout from 200ms to 100ms
+09/04/2026: DEV_VERSION 0.0.9
+- On led when start up
+- Change interval alarm: on 0.2s, off 225s
+- Change interval low bat: on 0.2s, off 60s
+- OUTPUT_OFF() when enter MODE_ALARM_TIMEOUT

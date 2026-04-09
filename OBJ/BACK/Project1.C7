@@ -12,7 +12,7 @@
  */
 
 /*********************************************** Definitions ***********************************************/
-#define DEV_VERSION						"0.0.7"
+#define DEV_VERSION						"0.0.9"
 // For Working mode
 #define MODE_NORMAL    					0
 #define MODE_ALARM    					1
@@ -31,8 +31,8 @@
 #define BUZZER_ALARM_ON_TIME  			20		// Calculate based on 10ms tick
 #define BUZZER_ALARM_OFF_TIME  			40		// Calculate based on 10ms tick
 
-#define BUZZER_LOW_BAT_ON_TIME  		50		// Calculate based on 10ms tick
-#define BUZZER_LOW_BAT_OFF_TIME  		350		// Calculate based on 10ms tick
+#define BUZZER_LOW_BAT_ON_TIME  		20		// Calculate based on 10ms tick
+#define BUZZER_LOW_BAT_OFF_TIME  		6020	// Calculate based on 10ms tick
 
 #define BUZZER_TOGGLE_COUNT  			2
 // For led mode
@@ -40,12 +40,12 @@
 #define LED_ALARM    					1
 #define LED_LOW_BAT    					2
 
-#define LED_NORMAL_ON_TIME  			5		// Calculate based on 100ms tick, 5*100ms = 0.5s
-#define LED_NORMAL_OFF_TIME  			2250 	// Calculate based on 100ms tick, 2250*100ms = 225s
+#define LED_NORMAL_ON_TIME  			2		// Calculate based on 100ms tick, 2*100ms = 0.2s
+#define LED_NORMAL_OFF_TIME  			2252 	// Calculate based on 100ms tick, 2250*100ms = 225s
 #define LED_ALARM_ON_TIME  				20 		// Calculate based on 10ms tick
 #define LED_ALARM_OFF_TIME  			40 		// Calculate based on 10ms tick
-#define LED_LOW_BAT_ON_TIME  			50 		// Calculate based on 10ms tick
-#define LED_LOW_BAT_OFF_TIME  			350 	// Calculate based on 10ms tick
+#define LED_LOW_BAT_ON_TIME  			20 		// Calculate based on 10ms tick
+#define LED_LOW_BAT_OFF_TIME  			6020 	// Calculate based on 10ms tick
 // For ADC
 #define ADC_ENABLE      				0x80 	// Bit 7
 #define ADC_START       				0x40 	// Bit 6
@@ -312,7 +312,9 @@ void FPPA0(void)
 	engint;             // Enable Global Interrupts
 
 	POWER_ON_ADC(); // On power supply for ADC pins
-	delay_ms(2000); // delay for fill capacitor
+	delay_ms(1200); // delay for fill capacitor
+	LED_ON();
+	delay_ms(800); // delay for fill capacitor
 	WDT_Init();
 
     while(1)
@@ -333,6 +335,9 @@ void FPPA0(void)
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				tick_buzzer = 0;
+				tick_led = 0;
 			}
 			else if(adc_value > NTC_BUTTON_MAX_VALUE) // Button is pressed, button short VCC to adc pin
 			{
@@ -343,6 +348,9 @@ void FPPA0(void)
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				tick_buzzer = 0;
+				tick_led = 0;
 			}
 			else
 			{
@@ -370,7 +378,6 @@ void FPPA0(void)
 		else if(working_mode == MODE_WAITING)
 	    {
 			POWER_ON_ADC(); // On power supply for ADC pins
-			//delay_ms(10); // delay for fill capacitor
 			// Check NCT, Measure Temperature
 			adc_value = ADC_Read(NTC_BUTTON); // Get ADC on NTC_BUTTON pin
 			if(adc_value > NTC_BUTTON_MAX_VALUE) // Button is pressed, button short VCC to adc pin
@@ -382,6 +389,9 @@ void FPPA0(void)
 				OUTPUT_ON();   // On Relay and RF
 				buzzer_mode = BUZZER_ALARM;
 				led_mode = LED_ALARM;
+				// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+				tick_buzzer = 0;
+				tick_led = 0;
 			}
 		}
 	    else if(working_mode == MODE_TEST)
@@ -416,6 +426,7 @@ void FPPA0(void)
 				tick_alarm++;
 				if(tick_alarm > MODE_ALARM_TIMEOUT)
 				{
+					OUTPUT_OFF();
 					working_mode = MODE_WAITING;
 					tick_alarm = 0;
 				}
@@ -443,8 +454,8 @@ void FPPA0(void)
 				ENTER_SLEEP();
 				// Back to the normal state after wakeup
 				wdreset;
-				TM3CT = 8; 	// Clear Tim3 counter
-				TM3B = 9; 	// Decrease Tim3 overflow interval to 10ms -> Totally 200ms with ILRC clock
+				TM3CT = 8; 	// Set Tim3 counter close to overflow value to pass the next interrupt 
+				TM3B = 9; 	// Set Tim3 overflow interval to 10ms
 				high_speed_system_clock_init();
 				enter_working_normal_mode();
 			}

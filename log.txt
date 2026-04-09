@@ -30,3 +30,8 @@
 - Do MODE_TEST 2 times if short press, continue if it is still pressing
 08/04/2026: DEV_VERSION 0.0.8
 - Change sleep timeout from 200ms to 100ms
+09/04/2026: DEV_VERSION 0.0.9
+- On led when start up
+- Change interval alarm: on 0.2s, off 225s
+- Change interval low bat: on 0.2s, off 60s
+- OUTPUT_OFF() when enter MODE_ALARM_TIMEOUT
