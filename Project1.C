@@ -12,7 +12,7 @@
  */
 
 /*********************************************** Definitions ***********************************************/
-#define DEV_VERSION						"0.0.9"
+#define DEV_VERSION						"0.0.10"
 // For Working mode
 #define MODE_NORMAL    					0
 #define MODE_ALARM    					1
@@ -358,9 +358,16 @@ void FPPA0(void)
 				adc_value = ADC_Read(VREF); // Get ADC on VREF pin
 				if(adc_value > VREF_AT_2V2) // Lower battery lead the vref adc read higher(30% 2 AA batteries)
 				{
-					// Set Low battery mode for Buzzer and Led
-					buzzer_mode = BUZZER_LOW_BAT;
-					led_mode = LED_LOW_BAT;
+					// Only update mode when it is not in low battery mode to avoid reset tick_buzzer and tick_led when already in low battery mode
+					if(buzzer_mode != BUZZER_LOW_BAT) 
+					{
+						// Set Low battery mode for Buzzer and Led
+						buzzer_mode = BUZZER_LOW_BAT;
+						led_mode = LED_LOW_BAT;
+						// Reset tick_buzzer and tick_led to sync the buzzer and led toggle
+						tick_buzzer = 0;
+						tick_led = 0;
+					}
 				}
 				else if(adc_value < VREF_AT_2V3) // 40% 2 AA batteries
 				{

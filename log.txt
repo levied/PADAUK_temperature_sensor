@@ -35,3 +35,5 @@
 - Change interval alarm: on 0.2s, off 225s
 - Change interval low bat: on 0.2s, off 60s
 - OUTPUT_OFF() when enter MODE_ALARM_TIMEOUT
+10/04/2026: DEV_VERSION 0.0.10
+- Sync tick led and buzzer when LOW BATTERY
