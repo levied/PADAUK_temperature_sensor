@@ -12,7 +12,7 @@
  */
 
 /*********************************************** Definitions ***********************************************/
-#define DEV_VERSION						"0.0.10"
+#define DEV_VERSION						"0.0.11"
 // For Working mode
 #define MODE_NORMAL    					0
 #define MODE_ALARM    					1
@@ -96,7 +96,9 @@ BYTE led_mode = LED_NORMAL;
 // For Temperature measurement
 BYTE adc_value = 0;
 BYTE setting_alarm_value = NTC_BUTTON_AT_SETTING_MAX_VALUE;
-BYTE temp_array[TEMP_ARRAY_SIZE] = {82,77,72,68,63,58,53,49,44,39,35,30,25,20};
+//BYTE temp_array[TEMP_ARRAY_SIZE] = {82,77,72,68,63,58,53,49,44,39,35,30,25,20};  // range 40-80 degree, MF11-474K
+BYTE temp_array[TEMP_ARRAY_SIZE] = {96,94,93,75,71,68,65,62,59,57,55,54,53,52}; // range 40-60 degree, MF11-474M
+
 // For Led
 WORD led_on_time;
 WORD led_off_time;

@@ -37,3 +37,6 @@
 - OUTPUT_OFF() when enter MODE_ALARM_TIMEOUT
 10/04/2026: DEV_VERSION 0.0.10
 - Sync tick led and buzzer when LOW BATTERY
+18/05/2026: DEV_VERSION 0.0.11
+- Change NCT from MF11-474K to MF11-474M
+- Change temperature range from 40-80 degree to 40-60 degree

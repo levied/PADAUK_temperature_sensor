@@ -405,6 +405,7 @@ void FPPA0(void)
 				if(test_mode_buzzer_toggle_count == 0) 
 				{
 					enter_working_normal_mode();
+					tick_led = LED_NORMAL_ON_TIME; // that 
 				}
 			}
 			else
