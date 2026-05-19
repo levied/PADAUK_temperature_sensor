@@ -12,7 +12,7 @@
  */
 
 /*********************************************** Definitions ***********************************************/
-#define DEV_VERSION						"0.0.12"
+#define DEV_VERSION						"0.0.13"
 // For Working mode
 #define MODE_NORMAL    					0
 #define MODE_ALARM    					1
@@ -68,8 +68,8 @@
 #define VR_MIN_VALUE  					0
 #define VR_MAX_VALUE  					140 // VR_MAX_VALUE = 255*(VR/(R1 + VR)); R1 = 470K, VR = 500K -> VR_MAX_VALUE = 131 + tolarent(9) = 140
 #define NTC_BUTTON_MAX_VALUE			230 // Using to detect Button is pressed on ADC pin
-#define NTC_BUTTON_AT_SETTING_MIN_VALUE	82
-#define NTC_BUTTON_AT_SETTING_MAX_VALUE	20
+#define NTC_BUTTON_AT_SETTING_MIN_VALUE	95
+#define NTC_BUTTON_AT_SETTING_MAX_VALUE	34
 #define TEMP_ARRAY_SIZE					16
 // For VREF checking
 #define VREF_AT_3V3						93
@@ -96,6 +96,7 @@ BYTE led_mode = LED_NORMAL;
 // For Temperature measurement
 BYTE adc_value = 0;
 BYTE setting_alarm_value = NTC_BUTTON_AT_SETTING_MAX_VALUE;
+BYTE setting_alarm_value_old = NTC_BUTTON_AT_SETTING_MAX_VALUE;
 //BYTE temp_array[TEMP_ARRAY_SIZE] = {82,77,72,68,63,58,53,49,44,39,35,30,25,20};  // range 40-80 degree, MF11-474K 
 //BYTE temp_array[TEMP_ARRAY_SIZE] = {96,94,93,75,71,68,65,62,59,57,55,54,53,52}; // range 40-60 degree, MF11-474M
 BYTE temp_array[TEMP_ARRAY_SIZE] = {95,90,84,79,74,69,64,60,56,52,49,45,42,39,37,34};  // range 35-65 degree, MF11-474K
@@ -382,6 +383,11 @@ void FPPA0(void)
 			if(adc_value < VR_MAX_VALUE) // Varistor divider voltage
 			{
 				setting_alarm_value = convert_setting_alarm(adc_value);
+				if(setting_alarm_value_old != setting_alarm_value)
+				{
+					setting_alarm_value_old = setting_alarm_value;
+					tick_led = 0; // Make LED blink 1 time on LED_NORMAL mode to indicate the new setting value 
+				}
 			}
 	    }
 		else if(working_mode == MODE_WAITING)
@@ -521,7 +527,7 @@ void FPPA0(void)
 				PWM_Off();
 		    }
 			//////////////////////////// Led mode process ////////////////////////////
-			if(led_mode == LED_NORMAL) // Turn ON 0.6s OFF 225s
+			if(led_mode == LED_NORMAL) // Turn ON 0.2s OFF 225s
 		    {
 				led_on_time = LED_NORMAL_ON_TIME;
 				led_off_time = LED_NORMAL_OFF_TIME;
@@ -531,7 +537,7 @@ void FPPA0(void)
 				led_on_time = LED_ALARM_ON_TIME;
 				led_off_time = LED_ALARM_OFF_TIME;
 		    }
-			else if(led_mode == LED_LOW_BAT) // Turn ON 0.5s OFF 3s
+			else if(led_mode == LED_LOW_BAT) // Turn ON 0.2s OFF 60s
 		    {
 				led_on_time = LED_LOW_BAT_ON_TIME;
 				led_off_time = LED_LOW_BAT_OFF_TIME;

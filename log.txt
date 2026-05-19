@@ -44,3 +44,5 @@
 - Change NCT from MF11-474M to MF11-474K
 - Change temperature range from 40-60 degree to 35-65 degree
 - Change convert_setting_alarm(): result increase step from 10 to 9
+19/05/2026: DEV_VERSION 0.0.13
+- Refesh tick_led = 0 if setting_alarm_value is changed to indicate the new setting value
