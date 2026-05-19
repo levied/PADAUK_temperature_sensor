@@ -40,3 +40,7 @@
 18/05/2026: DEV_VERSION 0.0.11
 - Change NCT from MF11-474K to MF11-474M
 - Change temperature range from 40-80 degree to 40-60 degree
+19/05/2026: DEV_VERSION 0.0.12
+- Change NCT from MF11-474M to MF11-474K
+- Change temperature range from 40-60 degree to 35-65 degree
+- Change convert_setting_alarm(): result increase step from 10 to 9

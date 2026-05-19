@@ -12,7 +12,7 @@
  */
 
 /*********************************************** Definitions ***********************************************/
-#define DEV_VERSION						"0.0.11"
+#define DEV_VERSION						"0.0.12"
 // For Working mode
 #define MODE_NORMAL    					0
 #define MODE_ALARM    					1
@@ -70,7 +70,7 @@
 #define NTC_BUTTON_MAX_VALUE			230 // Using to detect Button is pressed on ADC pin
 #define NTC_BUTTON_AT_SETTING_MIN_VALUE	82
 #define NTC_BUTTON_AT_SETTING_MAX_VALUE	20
-#define TEMP_ARRAY_SIZE					14
+#define TEMP_ARRAY_SIZE					16
 // For VREF checking
 #define VREF_AT_3V3						93
 #define VREF_AT_2V5						122
@@ -96,9 +96,9 @@ BYTE led_mode = LED_NORMAL;
 // For Temperature measurement
 BYTE adc_value = 0;
 BYTE setting_alarm_value = NTC_BUTTON_AT_SETTING_MAX_VALUE;
-//BYTE temp_array[TEMP_ARRAY_SIZE] = {82,77,72,68,63,58,53,49,44,39,35,30,25,20};
-BYTE temp_array[TEMP_ARRAY_SIZE] = {96,94,93,75,71,68,65,62,59,57,55,54,53,52};
-
+//BYTE temp_array[TEMP_ARRAY_SIZE] = {82,77,72,68,63,58,53,49,44,39,35,30,25,20};  // range 40-80 degree, MF11-474K 
+//BYTE temp_array[TEMP_ARRAY_SIZE] = {96,94,93,75,71,68,65,62,59,57,55,54,53,52}; // range 40-60 degree, MF11-474M
+BYTE temp_array[TEMP_ARRAY_SIZE] = {95,90,84,79,74,69,64,60,56,52,49,45,42,39,37,34};  // range 35-65 degree, MF11-474K
 // For Led
 WORD led_on_time;
 WORD led_off_time;
@@ -260,10 +260,10 @@ BYTE convert_setting_alarm(BYTE adc_val)
 			return result;
 		}
 		i++;
-		result += 10;
+		result += 9;
 	}
 
-	// If adc_val is higher than all results then return the last value of arrway(the highest temperature)
+	// If adc_val is higher than all results then return the last value of array(the highest temperature)
 	result = temp_array[TEMP_ARRAY_SIZE - 1];
 	return result;
 }
